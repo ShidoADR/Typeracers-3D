@@ -65,6 +65,10 @@
   #resultRows tr.player { color: var(--accent); }
   #menu { background: linear-gradient(90deg, rgba(8, 10, 16, .88), rgba(8, 10, 16, .35)); }
   #joinForm { display: flex; flex-direction: column; align-items: center; gap: 16px; width: min(560px, calc(100vw - 32px)); }
+  #skinChoices { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; width: 100%; }
+  .skinChoice { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; font: 700 14px system-ui, sans-serif; color: rgba(255,255,255,.75); }
+  .skinChoice select { width: 100%; font: 700 16px system-ui, sans-serif; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.1); color: #fff; }
+  .skinChoice option { color: #111; }
   #joinForm button, #pilotName { font: 700 20px system-ui, sans-serif; padding: 14px 20px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, .25); color: #fff; }
   #pilotName { background: rgba(255, 255, 255, .1); width: 100%; text-align: center; }
   .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; }
@@ -119,6 +123,17 @@
   </p>
   <form id="joinForm">
     <input id="pilotName" maxlength="16" placeholder="Votre pseudo" autocomplete="off" autofocus required>
+    <div id="skinChoices">
+      <label class="skinChoice">Voiture
+        <select id="carSkin"><option value="classic">Classique</option><option value="neon">Néon</option><option value="desert">Désert</option></select>
+      </label>
+      <label class="skinChoice">Pilote
+        <select id="driverSkin"><option value="human">Humain</option><option value="dino">Dinosaure</option></select>
+      </label>
+      <label class="skinChoice">Couleur
+        <select id="carColor"><option value="ff3b1f">Rouge</option><option value="2f7bff">Bleu</option><option value="2fd67b">Vert</option><option value="ffd21a">Jaune</option><option value="b04dff">Violet</option><option value="19d3da">Cyan</option><option value="ff5fa2">Rose</option><option value="f2f2f2">Blanc</option></select>
+      </label>
+    </div>
     <div class="modes">
       <button class="primary" value="new">Ouvrir une course<small>Vous êtes l'hôte, les collègues vous rejoignent</small></button>
       <button value="solo">Jouer en solo<small>Vous contre les bots, départ immédiat</small></button>
@@ -469,11 +484,48 @@ function buildNameLabel(name) {
   return label;
 }
 
+function buildDriverView(car) {
+  const driver = new THREE.Group();
+  const isDino = car.driverSkin === 'dino';
+  const headMaterial = new THREE.MeshStandardMaterial({ color: isDino ? 0x5ca85b : 0xf1b58b, roughness: 0.8 });
+  const suitMaterial = new THREE.MeshStandardMaterial({ color: isDino ? 0x345f38 : car.color, roughness: 0.7 });
+  const add = (geometry, material, position) => {
+    const part = new THREE.Mesh(geometry, material);
+    part.position.set(...position);
+    part.castShadow = true;
+    driver.add(part);
+  };
+  add(new THREE.SphereGeometry(isDino ? 0.42 : 0.34, 12, 10), headMaterial, [0, 1.62, -0.18]);
+  add(new THREE.BoxGeometry(isDino ? 0.62 : 0.55, 0.75, 0.42), suitMaterial, [0, 1.18, -0.03]);
+  if (isDino) {
+    add(new THREE.ConeGeometry(0.12, 0.34, 5), headMaterial, [-0.23, 2.02, -0.18]);
+    add(new THREE.ConeGeometry(0.12, 0.34, 5), headMaterial, [0.23, 2.02, -0.18]);
+    add(new THREE.ConeGeometry(0.15, 0.55, 6), headMaterial, [0, 1.05, 0.55]);
+  } else {
+    add(new THREE.BoxGeometry(0.7, 0.12, 0.08), new THREE.MeshStandardMaterial({ color: 0x20242b }), [0, 1.7, -0.48]);
+  }
+  driver.position.y = 0.05;
+  return driver;
+}
+
 function buildCarView(car) {
   const mesh = new THREE.Group();
   mesh.rotation.order = 'YXZ';
-  const paint = new THREE.MeshStandardMaterial({ color: car.color, metalness: 0.5, roughness: 0.35 });
-  const dark = new THREE.MeshStandardMaterial({ color: 0x14171c, metalness: 0.6, roughness: 0.3 });
+  const skins = {
+    classic: { main: car.color, accent: 0xffffff, glass: 0x14171c },
+    neon: { main: car.color, accent: 0x20f4ff, glass: 0x24103d },
+    desert: { main: 0xc98a4a, accent: 0xffe7a8, glass: 0x3e2b20 },
+  };
+  const skin = skins[car.carSkin] || skins.classic;
+  const paint = new THREE.MeshStandardMaterial({
+    color: car.color, metalness: car.carSkin === 'neon' ? 0.8 : 0.5, roughness: car.carSkin === 'desert' ? 0.7 : 0.35,
+    emissive: car.carSkin === 'neon' ? car.color : 0x000000, emissiveIntensity: car.carSkin === 'neon' ? 0.18 : 0,
+  });
+  const dark = new THREE.MeshStandardMaterial({ color: skin.glass, metalness: 0.6, roughness: 0.3 });
+  const accent = new THREE.MeshStandardMaterial({
+    color: skin.accent, emissive: car.carSkin === 'neon' ? skin.accent : 0x000000,
+    emissiveIntensity: car.carSkin === 'neon' ? 0.35 : 0,
+  });
   const addBox = (size, position, material) => {
     const box = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
     box.position.set(...position);
@@ -482,12 +534,12 @@ function buildCarView(car) {
   };
   addBox([1.9, 0.55, 4.2], [0, 0.62, 0], paint);
   addBox([1.6, 0.5, 2], [0, 1.12, -0.25], dark);
-  addBox([0.5, 0.02, 4.22], [0, 0.9, 0], new THREE.MeshStandardMaterial({ color: 0xffffff }));
+  addBox([0.5, 0.02, 4.22], [0, 0.9, 0], accent);
   addBox([1.9, 0.08, 0.45], [0, 1.5, -2], paint);
   addBox([0.08, 0.6, 0.3], [-0.8, 1.2, -1.95], dark);
   addBox([0.08, 0.6, 0.3], [0.8, 1.2, -1.95], dark);
   for (const side of [-0.65, 0.65]) {
-    addBox([0.4, 0.18, 0.06], [side, 0.7, 2.1], new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff2c0, emissiveIntensity: 2 }));
+    addBox([0.4, 0.18, 0.06], [side, 0.7, 2.1], new THREE.MeshStandardMaterial({ color: skin.accent, emissive: 0xfff2c0, emissiveIntensity: 2 }));
     addBox([0.4, 0.14, 0.06], [side, 0.72, -2.1], new THREE.MeshStandardMaterial({ color: 0xff2020, emissive: 0xff0000, emissiveIntensity: 1.5 }));
   }
 
@@ -502,6 +554,7 @@ function buildCarView(car) {
       wheels.push(wheel);
     }
   }
+  mesh.add(buildDriverView(car));
   if (car.id !== ownId) mesh.add(buildNameLabel(car.name));
   scene.add(mesh);
   return { car, mesh, wheels, rearLeftWheel: wheels[2] };
@@ -889,7 +942,10 @@ function enterRoom(requestedRoom) {
   element('connection').textContent = '';
   const name = element('pilotName').value.trim();
   try { localStorage.setItem('pilotName', name); } catch {}
-  events = new EventSource(`/events?room=${encodeURIComponent(requestedRoom)}&name=${encodeURIComponent(name)}`);
+  const carSkin = element('carSkin').value;
+  const driverSkin = element('driverSkin').value;
+  const carColor = element('carColor').value;
+  events = new EventSource(`/events?room=${encodeURIComponent(requestedRoom)}&name=${encodeURIComponent(name)}&carSkin=${carSkin}&driverSkin=${driverSkin}&carColor=${carColor}`);
   events.addEventListener('welcome', (message) => { ownId = JSON.parse(message.data).id; });
   events.onmessage = (message) => applySnapshot(JSON.parse(message.data));
   events.onerror = () => leaveRoom(ownId ? 'Connexion au serveur perdue.' : 'Impossible de rejoindre cette course (pleine ou fermée).');
