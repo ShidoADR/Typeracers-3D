@@ -124,11 +124,11 @@
   <form id="joinForm">
     <input id="pilotName" maxlength="16" placeholder="Votre pseudo" autocomplete="off" autofocus required>
     <div id="skinChoices">
-      <label class="skinChoice">Voiture
-        <select id="carSkin"><option value="classic">Classique</option><option value="neon">Néon</option><option value="desert">Désert</option></select>
+      <label class="skinChoice">Racer
+        <select id="vehicleSkin"><option value="car">Voiture</option><option value="human">Humain</option><option value="dino">Dinosaure</option></select>
       </label>
-      <label class="skinChoice">Pilote
-        <select id="driverSkin"><option value="human">Humain</option><option value="dino">Dinosaure</option></select>
+      <label class="skinChoice">Style voiture
+        <select id="carSkin"><option value="classic">Classique</option><option value="neon">Néon</option><option value="desert">Désert</option></select>
       </label>
       <label class="skinChoice">Couleur
         <select id="carColor"><option value="ff3b1f">Rouge</option><option value="2f7bff">Bleu</option><option value="2fd67b">Vert</option><option value="ffd21a">Jaune</option><option value="b04dff">Violet</option><option value="19d3da">Cyan</option><option value="ff5fa2">Rose</option><option value="f2f2f2">Blanc</option></select>
@@ -484,33 +484,40 @@ function buildNameLabel(name) {
   return label;
 }
 
-function buildDriverView(car) {
-  const driver = new THREE.Group();
-  const isDino = car.driverSkin === 'dino';
+function buildRunnerView(car) {
+  const runner = new THREE.Group();
+  const isDino = car.vehicleSkin === 'dino';
   const headMaterial = new THREE.MeshStandardMaterial({ color: isDino ? 0x5ca85b : 0xf1b58b, roughness: 0.8 });
-  const suitMaterial = new THREE.MeshStandardMaterial({ color: isDino ? 0x345f38 : car.color, roughness: 0.7 });
+  const bodyMaterial = new THREE.MeshStandardMaterial({ color: car.color, roughness: 0.7 });
   const add = (geometry, material, position) => {
     const part = new THREE.Mesh(geometry, material);
     part.position.set(...position);
     part.castShadow = true;
-    driver.add(part);
+    runner.add(part);
   };
-  add(new THREE.SphereGeometry(isDino ? 0.42 : 0.34, 12, 10), headMaterial, [0, 1.62, -0.18]);
-  add(new THREE.BoxGeometry(isDino ? 0.62 : 0.55, 0.75, 0.42), suitMaterial, [0, 1.18, -0.03]);
+  add(new THREE.SphereGeometry(isDino ? 0.55 : 0.38, 12, 10), headMaterial, [0, 1.75, -0.18]);
+  add(new THREE.BoxGeometry(isDino ? 0.75 : 0.5, 0.85, 0.45), bodyMaterial, [0, 1.18, -0.03]);
   if (isDino) {
-    add(new THREE.ConeGeometry(0.12, 0.34, 5), headMaterial, [-0.23, 2.02, -0.18]);
-    add(new THREE.ConeGeometry(0.12, 0.34, 5), headMaterial, [0.23, 2.02, -0.18]);
-    add(new THREE.ConeGeometry(0.15, 0.55, 6), headMaterial, [0, 1.05, 0.55]);
+    add(new THREE.ConeGeometry(0.14, 0.4, 5), headMaterial, [-0.28, 2.2, -0.18]);
+    add(new THREE.ConeGeometry(0.14, 0.4, 5), headMaterial, [0.28, 2.2, -0.18]);
+    add(new THREE.ConeGeometry(0.18, 0.65, 6), headMaterial, [0, 1.05, 0.55]);
   } else {
-    add(new THREE.BoxGeometry(0.7, 0.12, 0.08), new THREE.MeshStandardMaterial({ color: 0x20242b }), [0, 1.7, -0.48]);
+    add(new THREE.BoxGeometry(0.7, 0.12, 0.08), new THREE.MeshStandardMaterial({ color: 0x20242b }), [0, 1.82, -0.48]);
   }
-  driver.position.y = 0.05;
-  return driver;
+  for (const x of [-0.18, 0.18]) add(new THREE.BoxGeometry(0.16, 0.7, 0.16), bodyMaterial, [x, 0.5, 0]);
+  runner.position.y = 0.05;
+  return runner;
 }
 
 function buildCarView(car) {
   const mesh = new THREE.Group();
   mesh.rotation.order = 'YXZ';
+  if (car.vehicleSkin !== 'car') {
+    const runner = buildRunnerView(car);
+    if (car.id !== ownId) runner.add(buildNameLabel(car.name));
+    scene.add(runner);
+    return { car, mesh: runner, wheels: [], rearLeftWheel: null };
+  }
   const skins = {
     classic: { main: car.color, accent: 0xffffff, glass: 0x14171c },
     neon: { main: car.color, accent: 0x20f4ff, glass: 0x24103d },
@@ -554,7 +561,6 @@ function buildCarView(car) {
       wheels.push(wheel);
     }
   }
-  mesh.add(buildDriverView(car));
   if (car.id !== ownId) mesh.add(buildNameLabel(car.name));
   scene.add(mesh);
   return { car, mesh, wheels, rearLeftWheel: wheels[2] };
@@ -609,7 +615,7 @@ function updateCarView(view, time, dt) {
     Math.atan2(ground(cosHeading, -sinHeading) - ground(-cosHeading, sinHeading), 2) - (punctured ? 0.07 : 0),
   );
   for (const wheel of view.wheels) wheel.rotation.x += (car.speed * dt) / 0.42;
-  view.rearLeftWheel.scale.y = punctured ? 0.6 : 1;
+  if (view.rearLeftWheel) view.rearLeftWheel.scale.y = punctured ? 0.6 : 1;
 
   const dustRate = car.speed * 0.5 + (punctured ? 45 : 0);
   if ((car.speed > 5 || punctured) && Math.random() < dustRate * dt) {
@@ -943,9 +949,9 @@ function enterRoom(requestedRoom) {
   const name = element('pilotName').value.trim();
   try { localStorage.setItem('pilotName', name); } catch {}
   const carSkin = element('carSkin').value;
-  const driverSkin = element('driverSkin').value;
+  const vehicleSkin = element('vehicleSkin').value;
   const carColor = element('carColor').value;
-  events = new EventSource(`/events?room=${encodeURIComponent(requestedRoom)}&name=${encodeURIComponent(name)}&carSkin=${carSkin}&driverSkin=${driverSkin}&carColor=${carColor}`);
+  events = new EventSource(`/events?room=${encodeURIComponent(requestedRoom)}&name=${encodeURIComponent(name)}&carSkin=${carSkin}&vehicleSkin=${vehicleSkin}&carColor=${carColor}`);
   events.addEventListener('welcome', (message) => { ownId = JSON.parse(message.data).id; });
   events.onmessage = (message) => applySnapshot(JSON.parse(message.data));
   events.onerror = () => leaveRoom(ownId ? 'Connexion au serveur perdue.' : 'Impossible de rejoindre cette course (pleine ou fermée).');

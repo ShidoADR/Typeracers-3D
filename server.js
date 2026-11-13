@@ -13,7 +13,7 @@ const punctureChoices = [1, 2, 3, 5];
 const abandonedRaceMs = 5 * 60 * 1000;
 const palette = [0xff3b1f, 0x2f7bff, 0x2fd67b, 0xffd21a, 0xb04dff, 0x19d3da, 0xff5fa2, 0xf2f2f2];
 const carSkins = ['classic', 'neon', 'desert'];
-const driverSkins = ['human', 'dino'];
+const vehicleSkins = ['car', 'human', 'dino'];
 const colorChoices = new Map(palette.map((color) => [color.toString(16), color]));
 
 const botProfiles = [
@@ -65,7 +65,7 @@ function snapshot(room) {
     botsEnabled: room.botsEnabled,
     punctureSeconds: room.punctureSeconds,
     racePunctureSeconds: race ? race.punctureSeconds : 0,
-    players: [...room.members.values()].map(({ id, name, color, carSkin, driverSkin }) => ({ id, name, color, carSkin, driverSkin })),
+    players: [...room.members.values()].map(({ id, name, color, carSkin, vehicleSkin }) => ({ id, name, color, carSkin, vehicleSkin })),
     text: race ? race.text : '',
     startAt: race ? race.startAt : 0,
     cars: race ? race.cars : [],
@@ -88,10 +88,10 @@ function broadcast(room) {
 }
 
 function createRace(room) {
-  const humans = [...room.members.values()].map(({ id, name, color, carSkin, driverSkin }) => ({ id, name, color, carSkin, driverSkin, isBot: false }));
+  const humans = [...room.members.values()].map(({ id, name, color, carSkin, vehicleSkin }) => ({ id, name, color, carSkin, vehicleSkin, isBot: false }));
   const freeColors = palette.filter((color) => !humans.some((human) => human.color === color));
   const bots = botProfiles.slice(0, room.botsEnabled ? Math.max(0, minimumCars - humans.length) : 0).map((profile, i) => ({
-    ...profile, id: `bot-${profile.name}`, color: freeColors[i], carSkin: carSkins[(i + 1) % carSkins.length], driverSkin: i % 2 ? 'dino' : 'human', isBot: true, keystrokeBudget: 0,
+    ...profile, id: `bot-${profile.name}`, color: freeColors[i], carSkin: carSkins[(i + 1) % carSkins.length], vehicleSkin: i % 2 ? 'dino' : 'car', isBot: true, keystrokeBudget: 0,
   }));
   const drivers = [...humans, ...bots];
   const laneSpacing = drivers.length > 1 ? Math.min(3, 14 / (drivers.length - 1)) : 0;
@@ -181,13 +181,13 @@ function openEventStream(request, response, url) {
   const name = (url.searchParams.get('name') || '').trim().slice(0, 16) || 'Pilote';
   const color = palette.find((candidate) => ![...room.members.values()].some((player) => player.color === candidate));
   const requestedCarSkin = url.searchParams.get('carSkin');
-  const requestedDriverSkin = url.searchParams.get('driverSkin');
+  const requestedVehicleSkin = url.searchParams.get('vehicleSkin');
   const requestedColor = colorChoices.get((url.searchParams.get('carColor') || '').replace(/^#/, '').toLowerCase());
   const usedColors = new Set([...room.members.values()].map((member) => member.color));
   const player = {
     id, name, color: requestedColor !== undefined && !usedColors.has(requestedColor) ? requestedColor : color,
     carSkin: carSkins.includes(requestedCarSkin) ? requestedCarSkin : 'classic',
-    driverSkin: driverSkins.includes(requestedDriverSkin) ? requestedDriverSkin : 'human',
+    vehicleSkin: vehicleSkins.includes(requestedVehicleSkin) ? requestedVehicleSkin : 'car',
     stream: response, room,
   };
   response.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });

@@ -63,7 +63,7 @@ async function checkNetworkRace() {
   const post = (route, body) => fetch(base + route, { method: 'POST', body: JSON.stringify(body) });
   const get = async (route) => (await fetch(base + route)).json();
 
-  const ana = await join(base, 'Ana', 'new', { carSkin: 'neon', driverSkin: 'dino', carColor: '19d3da' });
+  const ana = await join(base, 'Ana', 'new', { carSkin: 'neon', vehicleSkin: 'dino', carColor: '19d3da' });
   const bao = await join(base, 'Bao', ana.roomId);
   const solo = await join(base, 'Solo', 'solo');
   assert.equal((await join(base, 'Zed', 'inexistante')).status, 404, 'une course fermée ne se rejoint pas');
@@ -85,7 +85,7 @@ async function checkNetworkRace() {
   assert.equal((await get(`/state?room=${ana.roomId}`)).punctureSeconds, 3, 'durée de crevaison réglable, valeurs hors liste refusées');
   const lobbyState = await get(`/state?room=${ana.roomId}`);
   const anaLobby = lobbyState.players.find((player) => player.id === ana.id);
-  assert.deepEqual([anaLobby.carSkin, anaLobby.driverSkin], ['neon', 'dino'], 'les skins choisis sont synchronisés dans la salle');
+  assert.deepEqual([anaLobby.carSkin, anaLobby.vehicleSkin], ['neon', 'dino'], 'les skins choisis sont synchronisés dans la salle');
   assert.equal(anaLobby.color, 0x19d3da, 'la couleur choisie est synchronisée dans la salle');
   assert.equal((await post('/start', { id: ana.id })).status, 204);
 
@@ -94,9 +94,9 @@ async function checkNetworkRace() {
   assert.equal(started.cars.length, 5, '2 humains + 3 bots');
   assert.equal(new Set(started.cars.map((car) => car.color)).size, 5, 'une couleur par voiture');
   const anaCar = started.cars.find((car) => car.id === ana.id);
-  assert.deepEqual([anaCar.carSkin, anaCar.driverSkin], ['neon', 'dino'], 'les skins choisis sont synchronisés dans la course');
+  assert.deepEqual([anaCar.carSkin, anaCar.vehicleSkin], ['neon', 'dino'], 'les skins choisis sont synchronisés dans la course');
   assert.equal(anaCar.color, 0x19d3da, 'la couleur choisie est synchronisée dans la course');
-  assert(started.cars.some((car) => car.driverSkin === 'dino'), 'les grilles peuvent contenir des pilotes dinosaures');
+  assert(started.cars.some((car) => car.vehicleSkin === 'dino'), 'les grilles peuvent contenir des dinosaures');
   assert.equal((await post('/start', { id: ana.id })).status, 409, 'pas de relance tant que des humains courent');
   assert((await get('/rooms'))[0].racing, 'la liste signale la course en cours');
 
